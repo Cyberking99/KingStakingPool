@@ -3,163 +3,156 @@
 pragma solidity ^0.8.26;
 
 contract KingCollections {
-    mapping(uint256 => mapping(address => uint256)) private _balances;
-    mapping(address => mapping(address => bool)) private _operatorApprovals;
-    
-    event TransferSingle(
-        address indexed operator,
-        address indexed from,
-        address indexed to,
-        uint256 id,
-        uint256 value
-    );
-    
-    event TransferBatch(
-        address indexed operator,
-        address indexed from,
-        address indexed to,
-        uint256[] ids,
-        uint256[] values
-    );
-    
-    event ApprovalForAll(address indexed account, address indexed operator, bool approved);
-    event URI(string value, uint256 indexed id);
-    
-    string private _baseURI;
 
-    constructor(string memory baseURI_) {
-        _baseURI = baseURI_;
+    address public owner;
+    mapping(uint256 => mapping(address => uint256)) private balances;
+    mapping(address => mapping(address => bool)) private operatorApproval;
+    mapping(uint256 => string) public tokenMetadata;
+
+    event TransferSingle(address indexed operator, address indexed from, address indexed to, uint256 id, uint256 value);
+    event TransferBatch(address indexed operator, address indexed from, address indexed to, uint256[] ids, uint256[] values);
+    event ApprovalForAll(address indexed account, address indexed operator, bool approved);
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Error(ERC1155): You are not the owner");
+        _;
+    }
+
+    function balanceOf(address account, uint256 id) public view returns (uint256) {
+        require(account != address(0), "Error(ERC1155): Balance query for the zero address");
+        return balances[id][account];
+    }
+
+    function balanceOfBatch(address[] memory accounts, uint256[] memory ids) public view returns (uint256[] memory) {
+        require(accounts.length == ids.length, "Error(ERC1155): Accounts and ids length does not match");
+        uint256[] memory batchBalances = new uint256[](accounts.length);
+        for (uint256 i = 0; i < accounts.length; i++) {
+            batchBalances[i] = balanceOf(accounts[i], ids[i]);
+        }
+        return batchBalances;
     }
 
     function setApprovalForAll(address operator, bool approved) public {
-        _operatorApprovals[msg.sender][operator] = approved;
+        operatorApproval[msg.sender][operator] = approved;
         emit ApprovalForAll(msg.sender, operator, approved);
     }
-    
+
     function isApprovedForAll(address account, address operator) public view returns (bool) {
-        return _operatorApprovals[account][operator];
+        return operatorApproval[account][operator];
     }
-    
-    function balanceOf(address account, uint256 id) public view returns (uint256) {
-        require(account != address(0), "Error(ERC1155): Balance query for the zero address");
-        return _balances[id][account];
+
+    function mint(address account, uint256 id, uint256 amount, string memory metadata) public onlyOwner {
+        require(account != address(0), "Error(ERC1155): Minting to the zero address not allowed");
+        
+        balances[id][account] += amount;
+        
+        tokenMetadata[id] = metadata;
+
+        emit TransferSingle(msg.sender, address(0), account, id, amount);
     }
-    
-    function balanceOfBatch(address[] memory accounts, uint256[] memory ids)
-        public
-        view
-        returns (uint256[] memory)
-    {
-        require(accounts.length == ids.length, "Error(ERC1155): Accounts and ids length does not match");
 
-        uint256[] memory batchBalances = new uint256[](accounts.length);
+    function mintBatch(address account, uint256[] memory ids, uint256[] memory amounts, string[] memory metadataList) public onlyOwner {
+        require(account != address(0), "Error(ERC1155): Minting to the zero address not allowed");
+        require(ids.length == amounts.length, "Error(ERC1155): IDs and amounts length does not match");
+        require(ids.length == metadataList.length, "Error(ERC1155): Metadata length mismatch");
 
-        for (uint256 i = 0; i < accounts.length; ++i) {
-            batchBalances[i] = balanceOf(accounts[i], ids[i]);
+        for (uint256 i = 0; i < ids.length; i++) {
+            balances[ids[i]][account] += amounts[i];
+            tokenMetadata[ids[i]] = metadataList[i];
         }
 
-        return batchBalances;
+        emit TransferBatch(msg.sender, address(0), account, ids, amounts);
     }
-    
-    function safeTransferFrom(
-        address from,
-        address to,
-        uint256 id,
-        uint256 amount
-    ) public {
-        require(
-            from == msg.sender || isApprovedForAll(from, msg.sender),
-            "Error(ERC1155): You are not owner or not approved to transfer"
-        );
+
+    function safeTransferFrom(address from, address to, uint256 id, uint256 amount) public {
+        require(from == msg.sender || isApprovedForAll(from, msg.sender), "Error(ERC1155): You are not owner or not approved to transfer");
         require(to != address(0), "Error(ERC1155): Transfer to the zero address not allowed");
+        require(balances[id][from] >= amount, "Error(ERC1155): Insufficient balance");
 
-        address operator = msg.sender;
+        balances[id][from] -= amount;
+        balances[id][to] += amount;
 
-        _balances[id][from] -= amount;
-        _balances[id][to] += amount;
-
-        emit TransferSingle(operator, from, to, id, amount);
+        emit TransferSingle(msg.sender, from, to, id, amount);
     }
-    
-    function safeBatchTransferFrom(
-        address from,
-        address to,
-        uint256[] memory ids,
-        uint256[] memory amounts
-    ) public {
-        require(
-            from == msg.sender || isApprovedForAll(from, msg.sender),
-            "Error(ERC1155): Caller is not owner nor approved"
-        );
-        require(to != address(0), "Error(ERC1155): Transfer to the zero address is not allowed");
-        require(ids.length == amounts.length, "Error(ERC1155): IDs and amounts length does not match");
 
-        address operator = msg.sender;
+    function uri(uint256 tokenId) public view returns (string memory) {
+        require(bytes(tokenMetadata[tokenId]).length > 0, "Error(ERC1155): Token ID does not exist");
 
-        for (uint256 i = 0; i < ids.length; ++i) {
-            uint256 id = ids[i];
-            uint256 amount = amounts[i];
+        string memory json = Base64.encode(bytes(string(abi.encodePacked(
+            '{"name": "KingCollection NFT #', uint2str(tokenId), '",',
+            '"description": "Reward for King Staking Pool",',
+            '"image": "', tokenMetadata[tokenId], '"}'
+        ))));
 
-            _balances[id][from] -= amount;
-            _balances[id][to] += amount;
-        }
-
-        emit TransferBatch(operator, from, to, ids, amounts);
+        return string(abi.encodePacked("data:application/json;base64,", json));
     }
-    
-    function mint(
-        address to,
-        uint256 id,
-        uint256 amount
-    ) public {
-        require(to != address(0), "Error(ERC1155): Minting to the zero address not allowed");
 
-        address operator = msg.sender;
-
-        _balances[id][to] += amount;
-
-        emit TransferSingle(operator, address(0), to, id, amount);
-    }
-    
-    function mintBatch(
-        address to,
-        uint256[] memory ids,
-        uint256[] memory amounts
-    ) public {
-        require(to != address(0), "Error(ERC1155): Minting to the zero address not allowed");
-        require(ids.length == amounts.length, "Error(ERC1155): IDs and amounts length does not match");
-
-        address operator = msg.sender;
-
-        for (uint256 i = 0; i < ids.length; ++i) {
-            _balances[ids[i]][to] += amounts[i];
-        }
-
-        emit TransferBatch(operator, address(0), to, ids, amounts);
-    }
-    
-    function uri(uint256 _id) public view returns (string memory) {
-        return string(abi.encodePacked(_baseURI, uint2str(_id)));
-    }
-    
-    function uint2str(uint256 _i) internal pure returns (string memory) {
+    function uint2str(uint256 _i) internal pure returns (string memory str) {
         if (_i == 0) {
             return "0";
         }
+
         uint256 j = _i;
-        uint256 len;
+        uint256 length;
+        
         while (j != 0) {
-            len++;
+            length++;
             j /= 10;
         }
-        bytes memory bstr = new bytes(len);
-        uint256 k = len;
-        while (_i != 0) {
-            k = k - 1;
-            uint8 temp = (48 + uint8(_i - (_i / 10) * 10));
-            bstr[k] = bytes1(temp);
-            _i /= 10;
+
+        bytes memory bstr = new bytes(length);
+        uint256 k = length;
+        j = _i;
+      
+        while (j != 0) {
+            bstr[--k] = bytes1(uint8(48 + j % 10));
+            j /= 10;
         }
-        return string(bstr);
+        
+        str = string(bstr);
+    }
+}
+
+library Base64 {
+    string internal constant TABLE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+    function encode(bytes memory data) internal pure returns (string memory) {
+        if (data.length == 0) return '';
+
+        string memory table = TABLE;
+        uint256 encodedLen = 4 * ((data.length + 2) / 3);
+
+        string memory result = new string(encodedLen + 32);
+
+        assembly {
+            mstore(result, encodedLen)
+            let tablePtr := add(table, 1)
+            let resultPtr := add(result, 32)
+
+            for {
+                let dataPtr := data
+                let endPtr := add(dataPtr, mload(data))
+            } lt(dataPtr, endPtr) {
+
+            } {
+                dataPtr := add(dataPtr, 3)
+                let input := mload(dataPtr)
+
+                mstore(resultPtr, shl(248, mload(add(tablePtr, and(shr(18, input), 0x3F)))))
+                resultPtr := add(resultPtr, 1)
+                mstore(resultPtr, shl(248, mload(add(tablePtr, and(shr(12, input), 0x3F)))))
+                resultPtr := add(resultPtr, 1)
+                mstore(resultPtr, shl(248, mload(add(tablePtr, and(shr(6, input), 0x3F)))))
+                resultPtr := add(resultPtr, 1)
+                mstore(resultPtr, shl(248, mload(add(tablePtr, and(input, 0x3F)))))
+                resultPtr := add(resultPtr, 1)
+            }
+        }
+
+        return result;
     }
 }

@@ -51,7 +51,7 @@ contract KingToken {
 
     function transferFrom(address sender, address recipient, uint256 amount) public returns (bool) {
         require(balanceOf[sender] >= amount, "Error(ERC20): Not enough tokens");
-        require(allowance[sender][msg.sender] >= amount, "Allowance exceeded");
+        require(allowance[sender][msg.sender] >= amount, "Error(ERC20): Allowance exceeded");
 
         balanceOf[sender] -= amount;
         balanceOf[recipient] += amount;

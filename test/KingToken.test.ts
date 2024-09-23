@@ -19,7 +19,7 @@ describe("KingToken", function () {
 
     it("should assign the total supply to the owner", async function () {
         const [owner] = await ethers.getSigners();
-        console.log(owner)
+        
         const balance = await kingToken.balanceOf(owner.address);
         expect(balance).to.equal(initialSupply);
     });

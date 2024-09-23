@@ -7,9 +7,20 @@ async function main() {
     console.log("KingToken deployed to:", await kingToken.getAddress());
 
     const KingCollections = await ethers.getContractFactory("KingCollections");
-    const kingCollections = await KingCollections.deploy("https://gateway.lighthouse.storage/ipfs/bafybeibnuhhhi56il2ok5arqziumn77halkwwnjlhn4motjp7bljvfiyl4");
+    const kingCollections = await KingCollections.deploy();
 
     console.log("KingCollections deployed to:", await kingCollections.getAddress());
+
+    console.log("Minting initial NFT...");
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#0000FF"/></svg>';
+    const mintTx = await kingCollections.mint("0x14dC79964da2C08b23698B3D3cc7Ca32193d9955", 1, 1, svg);
+    await mintTx.wait();
+
+    console.log("Initial NFT minted!");
+
+    // Fetch and log the token URI for the minted NFT
+    const tokenURI = await kingCollections.uri(1);
+    console.log("Token URI for minted NFT:", tokenURI);
 
     const KingStakingPool = await ethers.getContractFactory("KingStakingPool");
     const kingStakingPool = await KingStakingPool.deploy();
