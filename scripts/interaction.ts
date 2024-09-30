@@ -31,8 +31,8 @@ async function main() {
     console.log(`Approved 50 tokens for ${kingStakingPoolAddress}`);
 
     // Interact with KingCollections
-    await kingCollections.mint(addr1.address, 1, 100, "https://example.com/metadata/1");
-    console.log(`Minted 100 tokens for ${addr1.address} with ID 1`);
+    await kingCollections.mint(addr1.address, 1, 2, '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#0000FF"/></svg>');
+    console.log(`Minted 2 tokens for ${addr1.address} with ID 1`);
 
     const balanceCollection = await kingCollections.balanceOf(addr1.address, 1);
     console.log(`Addr1 Collection Balance: ${balanceCollection.toString()}`);

@@ -9,7 +9,7 @@ describe("KingToken", function () {
 
     beforeEach(async function () {
         const KingToken = await ethers.getContractFactory("KingToken");
-        kingToken = await KingToken.deploy("KingToken", "KTK", 18, 1000000);
+        kingToken = await KingToken.deploy("KingToken", "KTK", 18, initialSupply);
     });
 
     it("should have the correct name and symbol", async function () {
@@ -21,7 +21,8 @@ describe("KingToken", function () {
         const [owner] = await ethers.getSigners();
         
         const balance = await kingToken.balanceOf(owner.address);
-        expect(balance).to.equal(initialSupply);
+        const totalSupply = ethers.parseUnits(`${initialSupply}`, 18);
+        expect(balance).to.equal(totalSupply);
     });
 
     it("should transfer tokens correctly", async function () {
@@ -39,7 +40,8 @@ describe("KingToken", function () {
 
     it("should fail if insufficient balance for transfer", async function () {
         const [owner, addr1] = await ethers.getSigners();
-        const excessiveAmount = ethers.parseUnits("1000001", 18);
+        const amount = ethers.parseUnits("1000001", 18);
+        const excessiveAmount = ethers.parseUnits(`${amount}`, 18);
 
         await expect(kingToken.transfer(addr1.address, excessiveAmount))
             .to.be.revertedWith("Not enough tokens");
